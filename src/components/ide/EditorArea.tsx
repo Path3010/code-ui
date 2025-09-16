@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, File, Circle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { eventBus } from "@/lib/eventBus";
@@ -83,6 +82,9 @@ Happy coding! 🚀`,
     };
   }, []);
 
+  // Add refs to sync scroll between editor and line numbers
+  const numbersRef = useRef<HTMLDivElement | null>(null);
+
   const closeTab = (tabId: string) => {
     const newTabs = tabs.filter(tab => tab.id !== tabId);
     setTabs(newTabs);
@@ -153,33 +155,39 @@ Happy coding! 🚀`,
                 value={tab.id}
                 className="h-full m-0 p-0"
               >
-                {/* Make the entire editor area (line numbers + textarea) share the same scroll container */}
-                <ScrollArea className="h-full">
-                  <div className="flex min-h-full">
-                    {/* Line Numbers */}
-                    <div className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[50px] h-full">
-                      {tab.content.split('\n').map((_, index) => (
-                        <div
-                          key={index}
-                          className="text-xs text-[#858585] leading-6 font-mono"
-                        >
-                          {index + 1}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Editor */}
-                    <div className="flex-1">
-                      <textarea
-                        value={tab.content}
-                        onChange={(e) => updateTabContent(tab.id, e.target.value)}
-                        className="w-full h-full min-h-full bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
-                        style={{ fontFamily: 'Consolas, "Courier New", monospace' }}
-                        spellCheck={false}
-                      />
-                    </div>
+                {/* Make the entire editor area fill height and sync scrolls */}
+                <div className="h-full flex">
+                  {/* Line Numbers - full height, scroll synced */}
+                  <div
+                    ref={numbersRef}
+                    className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[56px] h-full overflow-auto"
+                  >
+                    {tab.content.split('\n').map((_, index) => (
+                      <div
+                        key={index}
+                        className="text-xs text-[#858585] leading-6 font-mono"
+                      >
+                        {index + 1}
+                      </div>
+                    ))}
                   </div>
-                </ScrollArea>
+
+                  {/* Editor */}
+                  <div className="flex-1 h-full overflow-auto">
+                    <textarea
+                      value={tab.content}
+                      onChange={(e) => updateTabContent(tab.id, e.target.value)}
+                      onScroll={(e) => {
+                        if (numbersRef.current) {
+                          numbersRef.current.scrollTop = (e.target as HTMLTextAreaElement).scrollTop;
+                        }
+                      }}
+                      className="w-full h-full min-h-full bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
+                      style={{ fontFamily: 'Consolas, "Courier New", monospace' }}
+                      spellCheck={false}
+                    />
+                  </div>
+                </div>
               </TabsContent>
             ))}
           </div>
