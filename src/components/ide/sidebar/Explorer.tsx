@@ -29,6 +29,8 @@ export function Explorer() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
+  // Track the most recently opened folder to target for creation
+  const [currentOpenFolderForCreation, setCurrentOpenFolderForCreation] = useState<Id<"files"> | null>(null);
 
   const projects = useQuery(api.projects.getUserProjects);
   const projectFiles = useQuery(
@@ -77,6 +79,7 @@ export function Explorer() {
         language: language || undefined,
         projectId: selectedProject,
         isDirectory: false,
+        parentId: currentOpenFolderForCreation || undefined, // create under opened folder if set
       });
 
       setNewFileOpen(false);
@@ -98,6 +101,7 @@ export function Explorer() {
         content: "",
         projectId: selectedProject,
         isDirectory: true,
+        parentId: currentOpenFolderForCreation || undefined, // create under opened folder if set
       });
 
       setNewFolderOpen(false);
@@ -111,8 +115,14 @@ export function Explorer() {
     const newExpanded = new Set(expandedFolders);
     if (newExpanded.has(folderId)) {
       newExpanded.delete(folderId);
+      // If we close the current target folder, clear it
+      if (currentOpenFolderForCreation === folderId) {
+        setCurrentOpenFolderForCreation(null);
+      }
     } else {
       newExpanded.add(folderId);
+      // The most recently opened folder becomes the target for creation
+      setCurrentOpenFolderForCreation(folderId);
     }
     setExpandedFolders(newExpanded);
   };
