@@ -10,24 +10,37 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 export function IDEInterface() {
   const [activeView, setActiveView] = useState<"explorer" | "search" | "git" | "extensions">("explorer");
   const [terminalVisible, setTerminalVisible] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const handleViewChange = (view: "explorer" | "search" | "git" | "extensions") => {
+    if (activeView === view) {
+      setSidebarCollapsed((c) => !c);
+    } else {
+      setActiveView(view);
+      setSidebarCollapsed(false);
+    }
+  };
 
   return (
     <div className="h-screen flex bg-[#1e1e1e] text-white overflow-hidden">
       {/* Activity Bar */}
-      <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+      <ActivityBar activeView={activeView} onViewChange={handleViewChange} />
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         <ResizablePanelGroup direction="horizontal" className="flex-1">
-          {/* Sidebar */}
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-            <Sidebar activeView={activeView} />
-          </ResizablePanel>
-          
-          <ResizableHandle className="w-1 bg-[#2d2d30] hover:bg-[#3e3e42] transition-colors" />
+          {/* Sidebar (conditionally render to avoid layout glitches) */}
+          {!sidebarCollapsed && (
+            <>
+              <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                <Sidebar activeView={activeView} />
+              </ResizablePanel>
+              <ResizableHandle className="w-1 bg-[#2d2d30] hover:bg-[#3e3e42] transition-colors" />
+            </>
+          )}
           
           {/* Editor and Terminal */}
-          <ResizablePanel defaultSize={80}>
+          <ResizablePanel defaultSize={sidebarCollapsed ? 100 : 80}>
             <ResizablePanelGroup direction="vertical">
               {/* Editor Area */}
               <ResizablePanel defaultSize={terminalVisible ? 70 : 100}>
