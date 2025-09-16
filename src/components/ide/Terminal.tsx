@@ -2,16 +2,29 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Terminal as TerminalIcon, Plus } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface TerminalProps {
   onClose: () => void;
 }
 
 export function Terminal({ onClose }: TerminalProps) {
+  const { user } = useAuth();
+  const userHandle =
+    (user?.name && user.name.trim()) ||
+    (user?.email ? user.email.split("@")[0] : null) ||
+    "user";
+  const workingDir = "/workspace";
+
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<Array<{ type: 'command' | 'output'; content: string }>>([
-    { type: 'output', content: 'Welcome to VS Code Clone Terminal' },
-    { type: 'output', content: 'Type "help" for available commands' },
+    { type: 'output', content: '👋 Welcome to Codespaces! You are on our default image.' },
+    { type: 'output', content: ' - It includes runtimes and tools for Python, Node.js, Docker, and more.' },
+    { type: 'output', content: ' - Want to use a custom image instead? See: https://aka.ms/configure-codespace' },
+    { type: 'output', content: '' },
+    { type: 'output', content: '🔎 Explore the editor fully via the Command Palette (Ctrl/Cmd + Shift + P).' },
+    { type: 'output', content: '' },
+    { type: 'output', content: "📝 Edit away! Run your app as usual, and we'll make it available for you to access." },
   ]);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -51,7 +64,7 @@ export function Terminal({ onClose }: TerminalProps) {
       case 'pwd':
         newHistory.push({
           type: 'output',
-          content: '/workspace/my-project'
+          content: workingDir
         });
         break;
       case 'date':
@@ -63,7 +76,7 @@ export function Terminal({ onClose }: TerminalProps) {
       case 'whoami':
         newHistory.push({
           type: 'output',
-          content: 'developer'
+          content: userHandle
         });
         break;
       default:
@@ -138,7 +151,13 @@ export function Terminal({ onClose }: TerminalProps) {
 
         {/* Input Line */}
         <div className="flex items-center px-3 py-2 border-t border-[#3e3e42]">
-          <span className="text-[#4ec9b0] font-mono text-sm mr-2">$</span>
+          {/* Styled prompt: @username -> /workspace $ */}
+          <span className="font-mono text-sm mr-2 whitespace-pre">
+            <span className="text-[#4ec9b0]">@{userHandle}</span>
+            <span className="text-[#56b6c2]"> → </span>
+            <span className="text-[#61afef]">{workingDir}</span>
+            <span className="text-[#cccccc]"> $</span>
+          </span>
           <input
             ref={inputRef}
             type="text"
