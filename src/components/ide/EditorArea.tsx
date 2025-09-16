@@ -153,30 +153,33 @@ Happy coding! 🚀`,
                 value={tab.id}
                 className="h-full m-0 p-0"
               >
-                <div className="h-full flex">
-                  {/* Line Numbers */}
-                  <div className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[50px]">
-                    {tab.content.split('\n').map((_, index) => (
-                      <div
-                        key={index}
-                        className="text-xs text-[#858585] leading-6 font-mono"
-                      >
-                        {index + 1}
-                      </div>
-                    ))}
-                  </div>
+                {/* Make the entire editor area (line numbers + textarea) share the same scroll container */}
+                <ScrollArea className="h-full">
+                  <div className="flex">
+                    {/* Line Numbers */}
+                    <div className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[50px]">
+                      {tab.content.split('\n').map((_, index) => (
+                        <div
+                          key={index}
+                          className="text-xs text-[#858585] leading-6 font-mono"
+                        >
+                          {index + 1}
+                        </div>
+                      ))}
+                    </div>
 
-                  {/* Editor */}
-                  <ScrollArea className="flex-1">
-                    <textarea
-                      value={tab.content}
-                      onChange={(e) => updateTabContent(tab.id, e.target.value)}
-                      className="w-full h-full min-h-[500px] bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
-                      style={{ fontFamily: 'Consolas, "Courier New", monospace' }}
-                      spellCheck={false}
-                    />
-                  </ScrollArea>
-                </div>
+                    {/* Editor */}
+                    <div className="flex-1">
+                      <textarea
+                        value={tab.content}
+                        onChange={(e) => updateTabContent(tab.id, e.target.value)}
+                        className="w-full h-full min-h-[500px] bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
+                        style={{ fontFamily: 'Consolas, "Courier New", monospace' }}
+                        spellCheck={false}
+                      />
+                    </div>
+                  </div>
+                </ScrollArea>
               </TabsContent>
             ))}
           </div>
