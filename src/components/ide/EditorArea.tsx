@@ -155,9 +155,9 @@ Happy coding! 🚀`,
               >
                 {/* Make the entire editor area (line numbers + textarea) share the same scroll container */}
                 <ScrollArea className="h-full">
-                  <div className="flex">
+                  <div className="flex min-h-full">
                     {/* Line Numbers */}
-                    <div className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[50px]">
+                    <div className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[50px] h-full">
                       {tab.content.split('\n').map((_, index) => (
                         <div
                           key={index}
@@ -173,7 +173,7 @@ Happy coding! 🚀`,
                       <textarea
                         value={tab.content}
                         onChange={(e) => updateTabContent(tab.id, e.target.value)}
-                        className="w-full h-full min-h-[500px] bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
+                        className="w-full h-full min-h-full bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
                         style={{ fontFamily: 'Consolas, "Courier New", monospace' }}
                         spellCheck={false}
                       />
