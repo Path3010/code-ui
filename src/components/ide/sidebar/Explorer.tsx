@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Id } from "@/convex/_generated/dataModel";
+import { openFileInEditor } from "@/lib/eventBus";
 
 export function Explorer() {
   const [selectedProject, setSelectedProject] = useState<Id<"projects"> | null>(null);
@@ -140,7 +141,12 @@ export function Explorer() {
         >
           <div
             className="flex items-center gap-2 px-2 py-1 hover:bg-[#2a2d2e] cursor-pointer group"
-            onClick={() => file.isDirectory ? toggleFolder(file._id) : null}
+            onClick={() => file.isDirectory ? toggleFolder(file._id) : openFileInEditor({
+              _id: file._id,
+              name: file.name,
+              content: file.content ?? "",
+              language: file.language ?? undefined,
+            })}
           >
             <Icon className="h-4 w-4 text-[#cccccc]" />
             <span className="text-sm text-[#cccccc] flex-1">{file.name}</span>

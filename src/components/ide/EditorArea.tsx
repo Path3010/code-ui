@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, File, Circle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { eventBus } from "@/lib/eventBus";
 
 interface EditorTab {
   id: string;
@@ -43,6 +44,44 @@ Happy coding! 🚀`,
     },
   ]);
   const [activeTab, setActiveTab] = useState("welcome");
+
+  // Add: listen for external "open-file" events to open/focus tabs
+  useEffect(() => {
+    function handleOpenFile(e: Event) {
+      const detail = (e as CustomEvent).detail as {
+        _id: string;
+        name: string;
+        content: string;
+        language?: string | null;
+      };
+      if (!detail || !detail._id) return;
+
+      setTabs((prev) => {
+        const exists = prev.find((t) => t.id === detail._id);
+        if (exists) {
+          // Focus existing tab
+          setActiveTab(detail._id);
+          return prev;
+        }
+        // Create new tab for file
+        const newTab = {
+          id: detail._id,
+          name: detail.name,
+          content: detail.content ?? "",
+          language: detail.language ?? "plaintext",
+          isDirty: false,
+        };
+        // Focus the new tab
+        setActiveTab(detail._id);
+        return [...prev, newTab];
+      });
+    }
+
+    eventBus.addEventListener("open-file", handleOpenFile as EventListener);
+    return () => {
+      eventBus.removeEventListener("open-file", handleOpenFile as EventListener);
+    };
+  }, []);
 
   const closeTab = (tabId: string) => {
     const newTabs = tabs.filter(tab => tab.id !== tabId);
