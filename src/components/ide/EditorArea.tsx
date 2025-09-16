@@ -84,6 +84,8 @@ Happy coding! 🚀`,
 
   // Add refs to sync scroll between editor and line numbers
   const numbersRef = useRef<HTMLDivElement | null>(null);
+  // Add: editor ref for bi-directional scroll sync
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
 
   const closeTab = (tabId: string) => {
     const newTabs = tabs.filter(tab => tab.id !== tabId);
@@ -160,6 +162,11 @@ Happy coding! 🚀`,
                   {/* Line Numbers - full height, scroll synced */}
                   <div
                     ref={numbersRef}
+                    onScroll={(e) => {
+                      if (editorRef.current) {
+                        editorRef.current.scrollTop = (e.target as HTMLDivElement).scrollTop;
+                      }
+                    }}
                     className="bg-[#1e1e1e] border-r border-[#3e3e42] px-2 py-4 text-right min-w-[56px] h-full overflow-auto"
                   >
                     {tab.content.split('\n').map((_, index) => (
@@ -175,6 +182,7 @@ Happy coding! 🚀`,
                   {/* Editor */}
                   <div className="flex-1 h-full overflow-auto">
                     <textarea
+                      ref={editorRef}
                       value={tab.content}
                       onChange={(e) => updateTabContent(tab.id, e.target.value)}
                       onScroll={(e) => {
@@ -182,6 +190,7 @@ Happy coding! 🚀`,
                           numbersRef.current.scrollTop = (e.target as HTMLTextAreaElement).scrollTop;
                         }
                       }}
+                      wrap="off"
                       className="w-full h-full min-h-full bg-transparent text-white font-mono text-sm leading-6 p-4 resize-none outline-none border-none"
                       style={{ fontFamily: 'Consolas, "Courier New", monospace' }}
                       spellCheck={false}
