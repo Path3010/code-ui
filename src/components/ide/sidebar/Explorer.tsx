@@ -117,9 +117,9 @@ export function Explorer() {
     setExpandedFolders(newExpanded);
   };
 
-  const getFileIcon = (fileName: string, isDirectory: boolean) => {
+  const getFileIcon = (isDirectory: boolean, isOpen: boolean) => {
     if (isDirectory) {
-      return expandedFolders.has(fileName as any) ? FolderOpen : Folder;
+      return isOpen ? FolderOpen : Folder;
     }
     return File;
   };
@@ -128,9 +128,9 @@ export function Explorer() {
     const filteredFiles = files.filter(file => file.parentId === parentId);
     
     return filteredFiles.map((file) => {
-      const Icon = getFileIcon(file.name, file.isDirectory);
-      const hasChildren = files.some(f => f.parentId === file._id);
       const isExpanded = expandedFolders.has(file._id);
+      const Icon = getFileIcon(file.isDirectory, isExpanded);
+      const hasChildren = files.some(f => f.parentId === file._id);
 
       return (
         <motion.div
@@ -140,7 +140,7 @@ export function Explorer() {
           className="select-none"
         >
           <div
-            className="flex items-center gap-2 px-2 py-1 hover:bg-[#2a2d2e] cursor-pointer group"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[#2a2d2e] cursor-pointer group transition-colors"
             onClick={() => file.isDirectory ? toggleFolder(file._id) : openFileInEditor({
               _id: file._id,
               name: file.name,
@@ -148,17 +148,20 @@ export function Explorer() {
               language: file.language ?? undefined,
             })}
           >
-            <Icon className="h-4 w-4 text-[#cccccc]" />
-            <span className="text-sm text-[#cccccc] flex-1">{file.name}</span>
+            <Icon className={`h-4 w-4 transition-colors ${file.isDirectory ? "text-[#e5c07b]" : "text-[#61afef]"}`} />
+            <span className={`text-sm flex-1 truncate ${file.isDirectory ? "text-[#e6e6e6] font-medium" : "text-[#cccccc]"}`}>
+              {file.name}
+            </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 text-[#cccccc] hover:bg-[#3e3e42]"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 text-[#cccccc] hover:bg-[#3e3e42] transition-opacity"
               onClick={(e) => {
                 e.stopPropagation();
                 deleteFile({ fileId: file._id });
                 toast.success("File deleted");
               }}
+              aria-label={`Delete ${file.name}`}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
