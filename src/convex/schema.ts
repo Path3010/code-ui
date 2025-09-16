@@ -32,12 +32,40 @@ const schema = defineSchema(
       role: v.optional(roleValidator), // role of the user. do not remove
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
-    // add other tables here
+    // Projects table for storing user projects
+    projects: defineTable({
+      name: v.string(),
+      description: v.optional(v.string()),
+      userId: v.id("users"),
+      isPublic: v.optional(v.boolean()),
+      language: v.optional(v.string()),
+      framework: v.optional(v.string()),
+    }).index("by_user", ["userId"]),
 
-    // tableName: defineTable({
-    //   ...
-    //   // table fields
-    // }).index("by_field", ["field"])
+    // Files table for storing project files
+    files: defineTable({
+      name: v.string(),
+      path: v.string(),
+      content: v.string(),
+      language: v.optional(v.string()),
+      projectId: v.id("projects"),
+      userId: v.id("users"),
+      isDirectory: v.optional(v.boolean()),
+      parentId: v.optional(v.id("files")),
+    })
+      .index("by_project", ["projectId"])
+      .index("by_user", ["userId"])
+      .index("by_parent", ["parentId"]),
+
+    // Recent files for quick access
+    recentFiles: defineTable({
+      userId: v.id("users"),
+      fileId: v.id("files"),
+      projectId: v.id("projects"),
+      lastAccessed: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_and_accessed", ["userId", "lastAccessed"]),
   },
   {
     schemaValidation: false,
