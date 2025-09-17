@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -16,8 +15,7 @@ import {
   Folder, 
   FolderOpen, 
   File,
-  Trash2,
-  Edit3
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Id } from "@/convex/_generated/dataModel";
@@ -40,76 +38,36 @@ export function Explorer() {
 
   const createProject = useMutation(api.projects.createProject);
   const createFile = useMutation(api.files.createFile);
-  const deleteProject = useMutation(api.projects.deleteProject);
   const deleteFile = useMutation(api.files.deleteFile);
 
-  const handleCreateProject = async (formData: FormData) => {
-    try {
-      const name = formData.get("name") as string;
-      const description = formData.get("description") as string;
-      const language = formData.get("language") as string;
-      const framework = formData.get("framework") as string;
-
-      const projectId = await createProject({
-        name,
-        description: description || undefined,
-        language: language || undefined,
-        framework: framework || undefined,
-      });
-
-      setSelectedProject(projectId);
-      setNewProjectOpen(false);
-      toast.success("Project created successfully!");
-    } catch (error) {
-      toast.error("Failed to create project");
+  // Auto-select first project if available
+  useEffect(() => {
+    if (projects && projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0]._id);
     }
-  };
+  }, [projects, selectedProject]);
 
-  const handleCreateFile = async (formData: FormData) => {
-    if (!selectedProject) return;
-
-    try {
-      const name = formData.get("name") as string;
-      const language = formData.get("language") as string;
-
-      await createFile({
-        name,
-        path: `/${name}`,
-        content: "",
-        language: language || undefined,
-        projectId: selectedProject,
-        isDirectory: false,
-        parentId: currentOpenFolderForCreation || undefined, // create under opened folder if set
-      });
-
-      setNewFileOpen(false);
-      toast.success("File created successfully!");
-    } catch (error) {
-      toast.error("Failed to create file");
+  // Auto-create a default workspace if user has no projects
+  const [bootstrapped, setBootstrapped] = useState(false);
+  useEffect(() => {
+    if (!bootstrapped && projects && projects.length === 0) {
+      (async () => {
+        try {
+          const projectId = await createProject({
+            name: "Workspace",
+            description: "Default workspace",
+            language: undefined,
+            framework: undefined,
+          });
+          setSelectedProject(projectId);
+        } catch (e) {
+          // noop: toast not used here to keep UI minimal
+        } finally {
+          setBootstrapped(true);
+        }
+      })();
     }
-  };
-
-  const handleCreateFolder = async (formData: FormData) => {
-    if (!selectedProject) return;
-
-    try {
-      const name = formData.get("name") as string;
-
-      await createFile({
-        name,
-        path: `/${name}`,
-        content: "",
-        projectId: selectedProject,
-        isDirectory: true,
-        parentId: currentOpenFolderForCreation || undefined, // create under opened folder if set
-      });
-
-      setNewFolderOpen(false);
-      toast.success("Folder created successfully!");
-    } catch (error) {
-      toast.error("Failed to create folder");
-    }
-  };
+  }, [projects, bootstrapped, createProject]);
 
   const toggleFolder = (folderId: Id<"files">) => {
     const newExpanded = new Set(expandedFolders);
@@ -125,6 +83,101 @@ export function Explorer() {
       setCurrentOpenFolderForCreation(folderId);
     }
     setExpandedFolders(newExpanded);
+  };
+
+  // Add: path join helper
+  const joinPaths = (base: string, name: string) => {
+    if (!base || base === "/") return `/${name}`;
+    return base.endsWith("/") ? `${base}${name}` : `${base}/${name}`;
+  };
+
+  // Add: create file handler (targets the most recently opened folder if any)
+  const handleCreateFile = async (formData: FormData) => {
+    const name = String(formData.get("name") || "").trim();
+    const language = (formData.get("language") as string | null) || undefined;
+
+    if (!name) {
+      toast.error("Please enter a file name");
+      return;
+    }
+    if (!selectedProject) {
+      toast.error("No project selected");
+      return;
+    }
+
+    const parentId = currentOpenFolderForCreation ?? undefined;
+
+    let parentPath = "/";
+    if (parentId && projectFiles) {
+      const parent = projectFiles.find((f: any) => f._id === parentId);
+      if (parent && typeof parent.path === "string") parentPath = parent.path;
+    }
+
+    const path = joinPaths(parentPath, name);
+
+    try {
+      await createFile({
+        name,
+        path,
+        content: "",
+        language: language || undefined,
+        projectId: selectedProject,
+        parentId,
+        isDirectory: false,
+      });
+      toast.success("File created");
+      setNewFileOpen(false);
+    } catch (err) {
+      toast.error("Failed to create file");
+    }
+  };
+
+  // Add: create folder handler (targets the most recently opened folder if any)
+  const handleCreateFolder = async (formData: FormData) => {
+    const name = String(formData.get("name") || "").trim();
+
+    if (!name) {
+      toast.error("Please enter a folder name");
+      return;
+    }
+    if (!selectedProject) {
+      toast.error("No project selected");
+      return;
+    }
+
+    const parentId = currentOpenFolderForCreation ?? undefined;
+
+    let parentPath = "/";
+    if (parentId && projectFiles) {
+      const parent = projectFiles.find((f: any) => f._id === parentId);
+      if (parent && typeof parent.path === "string") parentPath = parent.path;
+    }
+
+    const path = joinPaths(parentPath, name);
+
+    try {
+      const newId = await createFile({
+        name,
+        path,
+        content: "",
+        projectId: selectedProject,
+        parentId,
+        isDirectory: true,
+      });
+
+      // Expand and target the newly created folder
+      setExpandedFolders((prev) => {
+        const next = new Set(prev);
+        next.add(newId);
+        return next;
+      });
+      setCurrentOpenFolderForCreation(newId);
+
+      toast.success("Folder created");
+      setNewFolderOpen(false);
+    } catch (err) {
+      toast.error("Failed to create folder");
+    }
   };
 
   const getFileIcon = (isDirectory: boolean, isOpen: boolean) => {
@@ -198,106 +251,13 @@ export function Explorer() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="p-3 border-b border-[#3e3e42]">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-[#cccccc] uppercase tracking-wide">
             Explorer
           </h2>
-          <Dialog open={newProjectOpen} onOpenChange={setNewProjectOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-[#cccccc] hover:bg-[#3e3e42]"
-              >
-                <FolderPlus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-[#2d2d30] border-[#3e3e42] text-white">
-              <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-              </DialogHeader>
-              <form action={handleCreateProject} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Project Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    placeholder="my-awesome-project"
-                    className="bg-[#3c3c3c] border-[#3e3e42] text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    placeholder="Project description..."
-                    className="bg-[#3c3c3c] border-[#3e3e42] text-white"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="language">Language</Label>
-                    <Select name="language">
-                      <SelectTrigger className="bg-[#3c3c3c] border-[#3e3e42] text-white">
-                        <SelectValue placeholder="Select language" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#2d2d30] border-[#3e3e42]">
-                        <SelectItem value="javascript">JavaScript</SelectItem>
-                        <SelectItem value="typescript">TypeScript</SelectItem>
-                        <SelectItem value="python">Python</SelectItem>
-                        <SelectItem value="java">Java</SelectItem>
-                        <SelectItem value="csharp">C#</SelectItem>
-                        <SelectItem value="go">Go</SelectItem>
-                        <SelectItem value="rust">Rust</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="framework">Framework</Label>
-                    <Select name="framework">
-                      <SelectTrigger className="bg-[#3c3c3c] border-[#3e3e42] text-white">
-                        <SelectValue placeholder="Select framework" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#2d2d30] border-[#3e3e42]">
-                        <SelectItem value="react">React</SelectItem>
-                        <SelectItem value="vue">Vue</SelectItem>
-                        <SelectItem value="angular">Angular</SelectItem>
-                        <SelectItem value="svelte">Svelte</SelectItem>
-                        <SelectItem value="nextjs">Next.js</SelectItem>
-                        <SelectItem value="express">Express</SelectItem>
-                        <SelectItem value="fastapi">FastAPI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button type="submit" className="w-full">
-                  Create Project
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Project Selector */}
-        {projects && projects.length > 0 && (
-          <Select
-            value={selectedProject || ""}
-            onValueChange={(value) => setSelectedProject(value as Id<"projects">)}
-          >
-            <SelectTrigger className="bg-[#3c3c3c] border-[#3e3e42] text-white text-sm">
-              <SelectValue placeholder="Select a project" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#2d2d30] border-[#3e3e42]">
-              {projects.map((project) => (
-                <SelectItem key={project._id} value={project._id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       {/* File Actions */}
