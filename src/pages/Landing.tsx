@@ -82,22 +82,22 @@ export default function Landing() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
         >
-          <Button
-            onClick={() => navigate(isAuthenticated ? "/dashboard" : "/auth")}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
-          >
-            {isAuthenticated ? (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Open Editor
-              </>
-            ) : (
-              <>
-                Get Started
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </>
-            )}
-          </Button>
+            <Button
+              onClick={() => navigate(isAuthenticated ? "/templates" : "/auth")}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+            >
+              {isAuthenticated ? (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Choose Template
+                </>
+              ) : (
+                <>
+                  Get Started
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </Button>
         </motion.div>
       </nav>
 
@@ -129,13 +129,13 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               size="lg"
-              onClick={() => navigate(isAuthenticated ? "/dashboard" : "/auth")}
+              onClick={() => navigate(isAuthenticated ? "/templates" : "/auth")}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 px-8 py-6 text-lg"
             >
               {isAuthenticated ? (
                 <>
                   <Play className="h-5 w-5 mr-2" />
-                  Launch Editor
+                  Choose a Template
                 </>
               ) : (
                 <>

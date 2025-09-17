@@ -227,3 +227,120 @@ export const getRecentFiles = query({
     return filesWithDetails;
   },
 });
+
+export const applyTemplate = mutation({
+  args: {
+    projectId: v.id("projects"),
+    templateKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) {
+      throw new Error("User must be authenticated");
+    }
+
+    // Verify project ownership
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== user._id) {
+      throw new Error("Project not found or access denied");
+    }
+
+    // Cache project name to satisfy TypeScript in nested helpers
+    const projectName = project.name;
+
+    // Find root folder created at project creation (path "/")
+    const all = await ctx.db
+      .query("files")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    const root = all.find((f) => f.isDirectory && f.path === "/");
+    if (!root) {
+      throw new Error("Root folder not found");
+    }
+
+    type Entry = { path: string; isDir: boolean; content?: string; language?: string };
+    const byKey: Record<string, Array<Entry>> = {
+      blank: [
+        { path: "/src", isDir: true },
+        { path: "/.gitignore", isDir: false, content: "node_modules\n.dist\n" },
+        { path: "/src/main.txt", isDir: false, content: "Start here.", language: "plaintext" },
+      ],
+      react: [
+        { path: "/public", isDir: true },
+        { path: "/src", isDir: true },
+        { path: "/index.html", isDir: false, content: "<!doctype html><div id=\"root\"></div>" },
+        { path: "/src/App.jsx", isDir: false, content: "export default function App(){return <h1>Hello React</h1>}" , language: "javascript"},
+        { path: "/src/main.jsx", isDir: false, content: "import App from './App.jsx'\nconsole.log('React starter');", language: "javascript" },
+        { path: "/package.json", isDir: false, content: "{\n  \"name\": \"react-starter\",\n  \"private\": true\n}" , language: "json"},
+      ],
+      node: [
+        { path: "/src", isDir: true },
+        { path: "/src/index.js", isDir: false, content: "console.log('Hello from Node');", language: "javascript" },
+        { path: "/package.json", isDir: false, content: "{\n  \"name\": \"node-starter\"\n}", language: "json" },
+      ],
+      python: [
+        { path: "/src", isDir: true },
+        { path: "/src/main.py", isDir: false, content: "print('Hello, Python')", language: "python" },
+        { path: "/requirements.txt", isDir: false, content: "", language: "plaintext" },
+      ],
+    };
+
+    const entries = byKey[args.templateKey] ?? byKey["blank"];
+
+    // Ensure directories first
+    const dirs: Array<Entry> = entries.filter((e) => e.isDir);
+    const files: Array<Entry> = entries.filter((e) => !e.isDir);
+
+    // Map of directory path -> created id
+    const dirMap = new Map<string, any>();
+    dirMap.set("/", root._id);
+
+    // Helper to join parent path and name to find parentId from map
+    function parentOf(p: string): string {
+      if (p === "/") return "/";
+      const idx = p.lastIndexOf("/");
+      if (idx <= 0) return "/";
+      return p.slice(0, idx) || "/";
+    }
+    function baseName(p: string): string {
+      if (p === "/") return projectName;
+      const idx = p.lastIndexOf("/");
+      return p.slice(idx + 1);
+    }
+
+    // Create directories
+    for (const d of dirs) {
+      const parentPath = parentOf(d.path);
+      const parentId = dirMap.get(parentPath);
+      const name = baseName(d.path);
+      const inserted = await ctx.db.insert("files", {
+        name,
+        path: d.path,
+        content: "",
+        language: undefined,
+        projectId: args.projectId,
+        userId: user._id,
+        isDirectory: true,
+        parentId,
+      });
+      dirMap.set(d.path, inserted);
+    }
+
+    // Create files
+    for (const f of files) {
+      const parentPath = parentOf(f.path);
+      const parentId = dirMap.get(parentPath);
+      const name = baseName(f.path);
+      await ctx.db.insert("files", {
+        name,
+        path: f.path,
+        content: f.content ?? "",
+        language: f.language,
+        projectId: args.projectId,
+        userId: user._id,
+        isDirectory: false,
+        parentId,
+      });
+    }
+  },
+});
