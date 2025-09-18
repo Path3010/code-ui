@@ -51,6 +51,7 @@ export function Terminal({ onClose }: TerminalProps) {
   );
 
   const cleanProject = useMutation(api.files.cleanProjectFiles);
+  const resetFs = useMutation(api.files.resetFilesystem);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,14 +67,15 @@ export function Terminal({ onClose }: TerminalProps) {
         newHistory.push({
           type: 'output',
           content: `Available commands:
-  help     - Show this help message
-  clear    - Clear the terminal
-  ls       - List files (current project)
-  pwd      - Show current directory
-  echo     - Echo text
-  date     - Show current date
-  whoami   - Show current user
-  clean    - Remove stale project files (not reachable from root "/")`
+  help       - Show this help message
+  clear      - Clear the terminal
+  ls         - List files (current project)
+  pwd        - Show current directory
+  echo       - Echo text
+  date       - Show current date
+  whoami     - Show current user
+  clean      - Remove stale project files (not reachable from root "/")
+  reset-fs   - Reset filesystem by removing all ghost files (DB sync)`,
         });
         break;
       case 'clean': {
@@ -100,6 +102,34 @@ export function Terminal({ onClose }: TerminalProps) {
           setHistory((prev) => [
             ...prev,
             { type: 'output', content: 'No active project to clean.' },
+          ]);
+        }
+        return;
+      }
+      case 'reset-fs': {
+        newHistory.push({
+          type: 'output',
+          content: 'Resetting filesystem...',
+        });
+        setHistory(newHistory);
+        if (activeProjectId) {
+          resetFs({ projectId: activeProjectId as any })
+            .then(() => {
+              setHistory((prev) => [
+                ...prev,
+                { type: 'output', content: 'Filesystem reset: all ghost files removed.' },
+              ]);
+            })
+            .catch((e: any) => {
+              setHistory((prev) => [
+                ...prev,
+                { type: 'output', content: `Reset failed: ${e?.message || 'unknown error'}` },
+              ]);
+            });
+        } else {
+          setHistory((prev) => [
+            ...prev,
+            { type: 'output', content: 'No active project to reset.' },
           ]);
         }
         return;

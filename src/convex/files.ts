@@ -412,3 +412,60 @@ export const cleanProjectFiles = mutation({
     }
   },
 });
+
+export const resetFilesystem = mutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    // Reuse the same reachability logic as cleanProjectFiles to remove all ghost entries.
+    const user = await getCurrentUser(ctx);
+    if (!user) {
+      throw new Error("User must be authenticated");
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== user._id) {
+      throw new Error("Project not found or access denied");
+    }
+
+    const all = await ctx.db
+      .query("files")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    if (all.length === 0) return;
+
+    const root = all.find((f) => f.isDirectory && f.path === "/");
+    if (!root) return;
+
+    const childrenByParent: Map<string, Array<typeof all[number]>> = new Map();
+    for (const f of all) {
+      const key = f.parentId ? (f.parentId as unknown as string) : "__NULL__";
+      const arr = childrenByParent.get(key) ?? [];
+      arr.push(f);
+      childrenByParent.set(key, arr);
+    }
+
+    const reachable = new Set<string>();
+    const stack: Array<string> = [root._id as unknown as string];
+    reachable.add(root._id as unknown as string);
+
+    while (stack.length) {
+      const cur = stack.pop()!;
+      const kids = childrenByParent.get(cur) ?? [];
+      for (const child of kids) {
+        const idStr = child._id as unknown as string;
+        if (!reachable.has(idStr)) {
+          reachable.add(idStr);
+          if (child.isDirectory) stack.push(idStr);
+        }
+      }
+    }
+
+    for (const f of all) {
+      const idStr = f._id as unknown as string;
+      if (f._id !== root._id && !reachable.has(idStr)) {
+        await ctx.db.delete(f._id);
+      }
+    }
+  },
+});
