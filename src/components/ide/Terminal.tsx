@@ -170,8 +170,8 @@ export function Terminal({ onClose }: TerminalProps) {
       </div>
 
       {/* Terminal Content */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-auto" ref={scrollRef}>
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto" ref={scrollRef}>
           <div className="p-3 font-mono text-sm">
             {history.map((item, index) => (
               <div
