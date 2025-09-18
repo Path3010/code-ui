@@ -9,6 +9,9 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Code, Atom as ReactIcon, Terminal, Cpu, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 type TemplateKey = "blank" | "react" | "node" | "python";
 
@@ -31,6 +34,10 @@ export default function Templates() {
   const createProject = useMutation(api.projects.createProject);
   const applyTemplate = useMutation(api.files.applyTemplate);
 
+  const [namingOpen, setNamingOpen] = useState(false);
+  const [selectedTpl, setSelectedTpl] = useState<(typeof TEMPLATES)[number] | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string>("");
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate("/auth");
@@ -46,25 +53,32 @@ export default function Templates() {
   }
 
   const handleUseTemplate = async (tpl: (typeof TEMPLATES)[number]) => {
+    setSelectedTpl(tpl);
+    setWorkspaceName(`${tpl.title} Project`);
+    setNamingOpen(true);
+  };
+
+  const handleConfirmCreate = async () => {
+    if (!selectedTpl) return;
     try {
       toast("Creating project...");
       const projectId = await createProject({
-        name: `${tpl.title} Project`,
-        description: `${tpl.title} starter created from template`,
+        name: workspaceName.trim() || `${selectedTpl.title} Project`,
+        description: `${selectedTpl.title} starter created from template`,
         language: undefined,
-        framework: tpl.id === "react" ? "react" : undefined,
+        framework: selectedTpl.id === "react" ? "react" : undefined,
       });
 
-      await applyTemplate({ projectId, templateKey: tpl.id });
+      await applyTemplate({ projectId, templateKey: selectedTpl.id });
 
-      // Persist active project so Dashboard picks the right one
       try {
         localStorage.setItem("activeProjectId", projectId);
       } catch {
-        // ignore storage errors
+        // ignore
       }
 
       toast.success("Project ready!");
+      setNamingOpen(false);
       navigate("/dashboard");
     } catch (e: any) {
       toast.error(e?.message || "Failed to create from template");
@@ -87,6 +101,25 @@ export default function Templates() {
         </header>
 
         <ScrollArea className="h-[calc(100vh-140px)]">
+          <Dialog open={namingOpen} onOpenChange={setNamingOpen}>
+            <DialogContent className="bg-[#2d2d30] border-[#3e3e42] text-white">
+              <DialogHeader>
+                <DialogTitle>Name your workspace</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Input
+                  value={workspaceName}
+                  onChange={(e) => setWorkspaceName(e.target.value)}
+                  placeholder="e.g. IDE"
+                  className="bg-[#3c3c3c] border-[#3e3e42] text-white"
+                />
+                <Button onClick={handleConfirmCreate} className="w-full">
+                  Create
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

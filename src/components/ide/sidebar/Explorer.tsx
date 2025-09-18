@@ -332,7 +332,12 @@ export function Explorer() {
           </h2>
         </div>
 
-        {/* Project Selector */}
+        {/* Add: Selected workspace name shown as root label */}
+        {selectedProject && projects && (
+          <div className="mt-2 px-2 py-1.5 rounded bg-[#2a2d2e] border border-[#3e3e42] text-[#e6e6e6] text-sm font-medium truncate">
+            {projects.find((p) => p._id === selectedProject)?.name ?? "Workspace"}
+          </div>
+        )}
       </div>
 
       {/* File Actions */}
@@ -425,14 +430,12 @@ export function Explorer() {
       <ScrollArea className="flex-1">
         <div className="p-2">
           {projectFiles && projectFiles.length > 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="space-y-1"
-            >
-              {/* Render children of the root if it has any; otherwise render top-level items */}
-              {renderFileTree(projectFiles, startParentId)}
-            </motion.div>
+            <>
+              {/* Add: small padding under root name to visually nest children */}
+              <div className="ml-2">
+                {renderFileTree(projectFiles, startParentId)}
+              </div>
+            </>
           ) : selectedProject ? (
             <div className="text-center text-[#858585] text-sm py-8">
               No files in this project
