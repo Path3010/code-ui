@@ -56,6 +56,14 @@ export default function Templates() {
       });
 
       await applyTemplate({ projectId, templateKey: tpl.id });
+
+      // Persist active project so Dashboard picks the right one
+      try {
+        localStorage.setItem("activeProjectId", projectId);
+      } catch {
+        // ignore storage errors
+      }
+
       toast.success("Project ready!");
       navigate("/dashboard");
     } catch (e: any) {

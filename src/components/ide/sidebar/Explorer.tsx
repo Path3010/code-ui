@@ -22,7 +22,15 @@ import { Id } from "@/convex/_generated/dataModel";
 import { openFileInEditor } from "@/lib/eventBus";
 
 export function Explorer() {
-  const [selectedProject, setSelectedProject] = useState<Id<"projects"> | null>(null);
+  // Initialize from localStorage if available
+  const [selectedProject, setSelectedProject] = useState<Id<"projects"> | null>(() => {
+    try {
+      const stored = localStorage.getItem("activeProjectId");
+      return stored ? (stored as unknown as Id<"projects">) : null;
+    } catch {
+      return null;
+    }
+  });
   const [expandedFolders, setExpandedFolders] = useState<Set<Id<"files">>>(new Set());
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
@@ -40,11 +48,36 @@ export function Explorer() {
   const createFile = useMutation(api.files.createFile);
   const deleteFile = useMutation(api.files.deleteFile);
 
-  // Auto-select first project if available
+  // Keep localStorage in sync when selectedProject changes
   useEffect(() => {
-    if (projects && projects.length > 0 && !selectedProject) {
-      setSelectedProject(projects[0]._id);
+    if (!selectedProject) return;
+    try {
+      localStorage.setItem("activeProjectId", selectedProject as unknown as string);
+    } catch {
+      // ignore storage errors
     }
+  }, [selectedProject]);
+
+  // Auto-select first project OR use stored one if present
+  useEffect(() => {
+    if (!projects || projects.length === 0) return;
+    // If we already have a selected project, ensure it exists in list; if not, fall back
+    if (selectedProject && projects.some(p => p._id === selectedProject)) return;
+
+    // Try localStorage first
+    try {
+      const stored = localStorage.getItem("activeProjectId");
+      const match = stored ? projects.find(p => p._id === (stored as unknown as Id<"projects">)) : null;
+      if (match) {
+        setSelectedProject(match._id);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback: pick the first project
+    setSelectedProject(projects[0]._id);
   }, [projects, selectedProject]);
 
   // Auto-create a default workspace if user has no projects
@@ -60,14 +93,26 @@ export function Explorer() {
             framework: undefined,
           });
           setSelectedProject(projectId);
+          try {
+            localStorage.setItem("activeProjectId", projectId as unknown as string);
+          } catch {
+            // ignore
+          }
         } catch (e) {
-          // noop: toast not used here to keep UI minimal
+          // noop
         } finally {
           setBootstrapped(true);
         }
       })();
     }
   }, [projects, bootstrapped, createProject]);
+
+  // Auto-select first project if available
+  useEffect(() => {
+    if (projects && projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0]._id);
+    }
+  }, [projects, selectedProject]);
 
   const toggleFolder = (folderId: Id<"files">) => {
     const newExpanded = new Set(expandedFolders);

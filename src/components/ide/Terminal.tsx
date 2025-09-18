@@ -31,8 +31,19 @@ export function Terminal({ onClose }: TerminalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const projects = useQuery(api.projects.getUserProjects);
-  const activeProjectId =
-    projects && projects.length > 0 ? projects[0]._id : null;
+
+  // Read active project from localStorage when available, else fall back to first
+  let activeProjectId: any = null;
+  try {
+    const stored = localStorage.getItem("activeProjectId");
+    if (stored) activeProjectId = stored as any;
+  } catch {
+    // ignore
+  }
+  if (!activeProjectId && projects && projects.length > 0) {
+    activeProjectId = projects[0]._id;
+  }
+
   const projectFiles = useQuery(
     api.files.getProjectFiles,
     activeProjectId ? { projectId: activeProjectId } : "skip"
