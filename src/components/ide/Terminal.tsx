@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Terminal as TerminalIcon, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "convex/react";
@@ -172,14 +171,14 @@ export function Terminal({ onClose }: TerminalProps) {
 
       {/* Terminal Content */}
       <div className="flex-1 flex flex-col">
-        <ScrollArea className="flex-1" ref={scrollRef}>
+        <div className="flex-1 overflow-auto" ref={scrollRef}>
           <div className="p-3 font-mono text-sm">
             {history.map((item, index) => (
               <div
                 key={index}
                 className={`${
-                  item.type === 'command' 
-                    ? 'text-[#4ec9b0]' 
+                  item.type === 'command'
+                    ? 'text-[#4ec9b0]'
                     : 'text-[#cccccc]'
                 } whitespace-pre-wrap`}
               >
@@ -187,7 +186,7 @@ export function Terminal({ onClose }: TerminalProps) {
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Input Line */}
         <div className="flex items-center px-3 py-2 border-t border-[#3e3e42]">
