@@ -215,19 +215,28 @@ export function Explorer() {
             <span className={`text-sm flex-1 truncate ${file.isDirectory ? "text-[#e6e6e6] font-medium" : "text-[#cccccc]"}`}>
               {file.name}
             </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 text-[#cccccc] hover:bg-[#3e3e42] transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteFile({ fileId: file._id });
-                toast.success("File deleted");
-              }}
-              aria-label={`Delete ${file.name}`}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+            {/* Prevent deleting the root (path "/") and confirm deletes */}
+            {file.path !== "/" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 text-[#cccccc] hover:bg-[#3e3e42] transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const isDir = !!file.isDirectory;
+                  const ok = window.confirm(
+                    `Delete ${isDir ? "folder and all its contents" : "file"} "${file.name}"?`
+                  );
+                  if (!ok) return;
+                  deleteFile({ fileId: file._id })
+                    .then(() => toast.success("Deleted"))
+                    .catch((err) => toast.error(err?.message || "Failed to delete"));
+                }}
+                aria-label={`Delete ${file.name}`}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           
           <AnimatePresence>
