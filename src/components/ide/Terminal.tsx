@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Terminal as TerminalIcon, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 interface TerminalProps {
   onClose: () => void;
@@ -28,6 +30,14 @@ export function Terminal({ onClose }: TerminalProps) {
   ]);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const projects = useQuery(api.projects.getUserProjects);
+  const activeProjectId =
+    projects && projects.length > 0 ? projects[0]._id : null;
+  const projectFiles = useQuery(
+    api.files.getProjectFiles,
+    activeProjectId ? { projectId: activeProjectId } : "skip"
+  );
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -55,12 +65,42 @@ export function Terminal({ onClose }: TerminalProps) {
       case 'clear':
         setHistory([]);
         return;
-      case 'ls':
-        newHistory.push({
-          type: 'output',
-          content: 'README.md  src/  package.json  node_modules/'
-        });
+      case 'ls': {
+        if (projectFiles && projectFiles.length > 0) {
+          // Find the root folder (path "/"), then list its direct children
+          const root = projectFiles.find((f: any) => f.isDirectory && f.path === "/");
+          if (root) {
+            const children = projectFiles
+              .filter((f: any) => f.parentId === root._id)
+              .map((f: any) => (f.isDirectory ? `${f.name}/` : f.name))
+              .sort((a: string, b: string) => a.localeCompare(b));
+            newHistory.push({
+              type: 'output',
+              content: children.length ? children.join('  ') : '(empty)',
+            });
+          } else {
+            // Fallback: list all by path names if root not found
+            const names = projectFiles
+              .map((f: any) => (f.isDirectory ? `${f.name}/` : f.name))
+              .sort((a: string, b: string) => a.localeCompare(b));
+            newHistory.push({
+              type: 'output',
+              content: names.length ? names.join('  ') : '(empty)',
+            });
+          }
+        } else if (activeProjectId === null) {
+          newHistory.push({
+            type: 'output',
+            content: 'No project found. Open Templates to create one.',
+          });
+        } else {
+          newHistory.push({
+            type: 'output',
+            content: '(loading...)',
+          });
+        }
         break;
+      }
       case 'pwd':
         newHistory.push({
           type: 'output',
