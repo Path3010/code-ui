@@ -4,6 +4,7 @@ import { X, Terminal as TerminalIcon, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useMutation } from "convex/react";
 
 interface TerminalProps {
   onClose: () => void;
@@ -49,6 +50,8 @@ export function Terminal({ onClose }: TerminalProps) {
     activeProjectId ? { projectId: activeProjectId } : "skip"
   );
 
+  const cleanProject = useMutation(api.files.cleanProjectFiles);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -65,13 +68,42 @@ export function Terminal({ onClose }: TerminalProps) {
           content: `Available commands:
   help     - Show this help message
   clear    - Clear the terminal
-  ls       - List files (simulated)
+  ls       - List files (current project)
   pwd      - Show current directory
   echo     - Echo text
   date     - Show current date
-  whoami   - Show current user`
+  whoami   - Show current user
+  clean    - Remove stale project files (not reachable from root "/")`
         });
         break;
+      case 'clean': {
+        newHistory.push({
+          type: 'output',
+          content: 'Cleaning project files...'
+        });
+        setHistory(newHistory);
+        if (activeProjectId) {
+          cleanProject({ projectId: activeProjectId as any })
+            .then(() => {
+              setHistory((prev) => [
+                ...prev,
+                { type: 'output', content: 'Cleanup complete.' },
+              ]);
+            })
+            .catch((e: any) => {
+              setHistory((prev) => [
+                ...prev,
+                { type: 'output', content: `Cleanup failed: ${e?.message || 'unknown error'}` },
+              ]);
+            });
+        } else {
+          setHistory((prev) => [
+            ...prev,
+            { type: 'output', content: 'No active project to clean.' },
+          ]);
+        }
+        return;
+      }
       case 'clear':
         setHistory([]);
         return;
