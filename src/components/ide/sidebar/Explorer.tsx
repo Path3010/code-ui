@@ -117,6 +117,12 @@ export function Explorer() {
   // Auto-detect project root folder (path "/")
   const rootFolder = projectFiles?.find((f: any) => f.isDirectory && f.path === "/");
 
+  // Determine which parent to render from: root if it actually has children, else top-level (undefined)
+  const startParentId: Id<"files"> | undefined =
+    rootFolder && projectFiles?.some((f: any) => f.parentId === rootFolder._id)
+      ? rootFolder._id
+      : undefined;
+
   // When files load, auto-expand the root folder and target it for creation
   useEffect(() => {
     if (!rootFolder) return;
@@ -424,8 +430,8 @@ export function Explorer() {
               animate={{ opacity: 1 }}
               className="space-y-1"
             >
-              {/* Render children of the root folder so the explorer isn't empty initially */}
-              {renderFileTree(projectFiles, rootFolder?._id)}
+              {/* Render children of the root if it has any; otherwise render top-level items */}
+              {renderFileTree(projectFiles, startParentId)}
             </motion.div>
           ) : selectedProject ? (
             <div className="text-center text-[#858585] text-sm py-8">
