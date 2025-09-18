@@ -114,6 +114,21 @@ export function Explorer() {
     }
   }, [projects, selectedProject]);
 
+  // Auto-detect project root folder (path "/")
+  const rootFolder = projectFiles?.find((f: any) => f.isDirectory && f.path === "/");
+
+  // When files load, auto-expand the root folder and target it for creation
+  useEffect(() => {
+    if (!rootFolder) return;
+    setExpandedFolders((prev) => {
+      if (prev.has(rootFolder._id)) return prev;
+      const next = new Set(prev);
+      next.add(rootFolder._id);
+      return next;
+    });
+    setCurrentOpenFolderForCreation((prev) => prev ?? rootFolder._id);
+  }, [rootFolder]);
+
   const toggleFolder = (folderId: Id<"files">) => {
     const newExpanded = new Set(expandedFolders);
     if (newExpanded.has(folderId)) {
@@ -409,7 +424,8 @@ export function Explorer() {
               animate={{ opacity: 1 }}
               className="space-y-1"
             >
-              {renderFileTree(projectFiles)}
+              {/* Render children of the root folder so the explorer isn't empty initially */}
+              {renderFileTree(projectFiles, rootFolder?._id)}
             </motion.div>
           ) : selectedProject ? (
             <div className="text-center text-[#858585] text-sm py-8">
