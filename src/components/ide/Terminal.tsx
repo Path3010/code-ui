@@ -46,6 +46,20 @@ export function Terminal({ onClose }: TerminalProps) {
 
   const cleanProject = useMutation(api.files.cleanProjectFiles);
 
+  // Add: safe fit helper that only fits when container has dimensions
+  function safeFit() {
+    const container = containerRef.current;
+    const fit = fitRef.current;
+    if (!container || !fit) return;
+    const { clientWidth, clientHeight } = container;
+    if (!clientWidth || !clientHeight) return;
+    try {
+      fit.fit();
+    } catch {
+      // ignore fitting errors during rapid layout changes
+    }
+  }
+
   // Initialize xterm
   useEffect(() => {
     if (containerRef.current && !termRef.current) {
@@ -79,9 +93,13 @@ export function Terminal({ onClose }: TerminalProps) {
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(containerRef.current);
-      fit.fit();
-      termRef.current = term;
       fitRef.current = fit;
+      termRef.current = term;
+
+      // Replace direct fit with safe fit
+      safeFit();
+      // Fit again on next tick to account for late layout
+      setTimeout(safeFit, 0);
 
       printWelcome();
 
@@ -98,12 +116,13 @@ export function Terminal({ onClose }: TerminalProps) {
   }, []);
 
   useEffect(() => {
-    // re-fit on layout changes
-    fitRef.current?.fit();
+    // re-fit on layout changes safely
+    safeFit();
   });
 
   function handleResize() {
-    fitRef.current?.fit();
+    // Use safe fit on window resize
+    safeFit();
   }
 
   function prompt() {
