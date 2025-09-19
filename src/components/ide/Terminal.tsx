@@ -2,9 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Terminal as TerminalIcon, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useMutation } from "convex/react";
+import { Terminal as XTerm } from "xterm";
+import { FitAddon } from "xterm-addon-fit";
+import "xterm/css/xterm.css";
 
 interface TerminalProps {
   onClose: () => void;
@@ -18,22 +20,14 @@ export function Terminal({ onClose }: TerminalProps) {
     "user";
   const workingDir = "/workspace";
 
-  const [input, setInput] = useState("");
-  const [history, setHistory] = useState<Array<{ type: 'command' | 'output'; content: string }>>([
-    { type: 'output', content: '👋 Welcome to Codespaces! You are on our default image.' },
-    { type: 'output', content: ' - It includes runtimes and tools for Python, Node.js, Docker, and more.' },
-    { type: 'output', content: ' - Want to use a custom image instead? See: https://aka.ms/configure-codespace' },
-    { type: 'output', content: '' },
-    { type: 'output', content: '🔎 Explore the editor fully via the Command Palette (Ctrl/Cmd + Shift + P).' },
-    { type: 'output', content: '' },
-    { type: 'output', content: "📝 Edit away! Run your app as usual, and we'll make it available for you to access." },
-  ]);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // xterm refs
+  const termRef = useRef<XTerm | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const currentInputRef = useRef<string>("");
 
   const projects = useQuery(api.projects.getUserProjects);
 
-  // Read active project from localStorage when available, else fall back to first
   let activeProjectId: any = null;
   try {
     const stored = localStorage.getItem("activeProjectId");
@@ -51,141 +45,203 @@ export function Terminal({ onClose }: TerminalProps) {
   );
 
   const cleanProject = useMutation(api.files.cleanProjectFiles);
-  // reset-fs command removed
+
+  // Initialize xterm
+  useEffect(() => {
+    if (containerRef.current && !termRef.current) {
+      const term = new XTerm({
+        convertEol: true,
+        fontFamily: 'Consolas, "Courier New", monospace',
+        fontSize: 13,
+        theme: {
+          background: "#1e1e1e",
+          foreground: "#cccccc",
+          cursor: "#cccccc",
+          selection: "#3e3e42",
+          black: "#000000",
+          red: "#f44747",
+          green: "#4ec9b0",
+          yellow: "#e5c07b",
+          blue: "#61afef",
+          magenta: "#c586c0",
+          cyan: "#56b6c2",
+          white: "#d4d4d4",
+          brightBlack: "#666666",
+          brightRed: "#f44747",
+          brightGreen: "#4ec9b0",
+          brightYellow: "#e5c07b",
+          brightBlue: "#61afef",
+          brightMagenta: "#c586c0",
+          brightCyan: "#56b6c2",
+          brightWhite: "#ffffff",
+        },
+      });
+      const fit = new FitAddon();
+      term.loadAddon(fit);
+      term.open(containerRef.current);
+      fit.fit();
+      termRef.current = term;
+      fitRef.current = fit;
+
+      printWelcome();
+
+      term.onData((data: string) => handleTermInput(data));
+      window.addEventListener("resize", handleResize);
+    }
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      termRef.current?.dispose();
+      termRef.current = null;
+      fitRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [history]);
+    // re-fit on layout changes
+    fitRef.current?.fit();
+  });
 
-  const handleCommand = (command: string) => {
-    const newHistory = [...history, { type: 'command' as const, content: `$ ${command}` }];
-    
-    switch (command.toLowerCase().trim()) {
-      case 'help':
-        newHistory.push({
-          type: 'output',
-          content: `Available commands:
+  function handleResize() {
+    fitRef.current?.fit();
+  }
+
+  function prompt() {
+    const term = termRef.current;
+    if (!term) return;
+    term.write(
+      `\x1b[38;2;78;201;176m@${userHandle}\x1b[0m \x1b[38;2;86;182;194m→\x1b[0m \x1b[38;2;97;175;239m${workingDir}\x1b[0m \x1b[38;2;204;204;204m$\x1b[0m `
+    );
+  }
+
+  function println(text = "") {
+    termRef.current?.writeln(text);
+  }
+
+  function printWelcome() {
+    println("👋 Welcome to Codespaces! You are on our default image.");
+    println(" - It includes runtimes and tools for Python, Node.js, Docker, and more.");
+    println(" - Want to use a custom image instead? See: https://aka.ms/configure-codespace");
+    println("");
+    println("🔎 Explore the editor fully via the Command Palette (Ctrl/Cmd + Shift + P).");
+    println("");
+    println("📝 Edit away! Run your app as usual, and we'll make it available for you to access.");
+    prompt();
+  }
+
+  function handleTermInput(data: string) {
+    const term = termRef.current;
+    if (!term) return;
+
+    for (const ch of data) {
+      const code = ch.charCodeAt(0);
+      // Enter
+      if (code === 13) {
+        term.write("\r\n");
+        const cmd = currentInputRef.current;
+        currentInputRef.current = "";
+        runCommand(cmd);
+        return;
+      }
+      // Backspace (DEL or BS)
+      if (code === 127 || code === 8) {
+        if (currentInputRef.current.length > 0) {
+          currentInputRef.current = currentInputRef.current.slice(0, -1);
+          term.write("\b \b");
+        }
+        continue;
+      }
+      // Printable
+      if (code >= 32 && code <= 126) {
+        currentInputRef.current += ch;
+        term.write(ch);
+      }
+    }
+  }
+
+  function runCommand(raw: string) {
+    const command = raw.toLowerCase().trim();
+    switch (command) {
+      case "help":
+        println(`Available commands:
   help       - Show this help message
   clear      - Clear the terminal
   ls         - List files (current project)
   pwd        - Show current directory
-  echo       - Echo text
+  echo       - Echo text (use: echo <text>)
   date       - Show current date
   whoami     - Show current user
   clean      - Remove stale project files (not reachable from root "/")
-`,
-        });
+`);
+        prompt();
         break;
-      case 'clean': {
-        newHistory.push({
-          type: 'output',
-          content: 'Cleaning project files...'
-        });
-        setHistory(newHistory);
-        if (activeProjectId) {
-          cleanProject({ projectId: activeProjectId as any })
-            .then(() => {
-              setHistory((prev) => [
-                ...prev,
-                { type: 'output', content: 'Cleanup complete.' },
-              ]);
-            })
-            .catch((e: any) => {
-              setHistory((prev) => [
-                ...prev,
-                { type: 'output', content: `Cleanup failed: ${e?.message || 'unknown error'}` },
-              ]);
-            });
-        } else {
-          setHistory((prev) => [
-            ...prev,
-            { type: 'output', content: 'No active project to clean.' },
-          ]);
-        }
-        return;
-      }
-      case 'clear':
-        setHistory([]);
-        return;
-      case 'ls': {
+      case "clear":
+        termRef.current?.clear();
+        prompt();
+        break;
+      case "pwd":
+        println(workingDir);
+        prompt();
+        break;
+      case "date":
+        println(new Date().toString());
+        prompt();
+        break;
+      case "whoami":
+        println(userHandle);
+        prompt();
+        break;
+      case "ls": {
         if (projectFiles && projectFiles.length > 0) {
-          // Find the root folder (path "/"), then list its direct children
           const root = projectFiles.find((f: any) => f.isDirectory && f.path === "/");
           if (root) {
             const children = projectFiles
               .filter((f: any) => f.parentId === root._id)
               .map((f: any) => (f.isDirectory ? `${f.name}/` : f.name))
               .sort((a: string, b: string) => a.localeCompare(b));
-            newHistory.push({
-              type: 'output',
-              content: children.length ? children.join('  ') : '(empty)',
-            });
+            println(children.length ? children.join("  ") : "(empty)");
           } else {
-            // Fallback: list all by path names if root not found
             const names = projectFiles
               .map((f: any) => (f.isDirectory ? `${f.name}/` : f.name))
               .sort((a: string, b: string) => a.localeCompare(b));
-            newHistory.push({
-              type: 'output',
-              content: names.length ? names.join('  ') : '(empty)',
-            });
+            println(names.length ? names.join("  ") : "(empty)");
           }
         } else if (activeProjectId === null) {
-          newHistory.push({
-            type: 'output',
-            content: 'No project found. Open Templates to create one.',
-          });
+          println("No project found. Open Templates to create one.");
         } else {
-          newHistory.push({
-            type: 'output',
-            content: '(loading...)',
-          });
+          println("(loading...)");
+        }
+        prompt();
+        break;
+      }
+      case "clean": {
+        println("Cleaning project files...");
+        if (activeProjectId) {
+          cleanProject({ projectId: activeProjectId as any })
+            .then(() => {
+              println("Cleanup complete.");
+              prompt();
+            })
+            .catch((e: any) => {
+              println(`Cleanup failed: ${e?.message || "unknown error"}`);
+              prompt();
+            });
+        } else {
+          println("No active project to clean.");
+          prompt();
         }
         break;
       }
-      case 'pwd':
-        newHistory.push({
-          type: 'output',
-          content: workingDir
-        });
-        break;
-      case 'date':
-        newHistory.push({
-          type: 'output',
-          content: new Date().toString()
-        });
-        break;
-      case 'whoami':
-        newHistory.push({
-          type: 'output',
-          content: userHandle
-        });
-        break;
-      default:
-        if (command.startsWith('echo ')) {
-          newHistory.push({
-            type: 'output',
-            content: command.substring(5)
-          });
-        } else if (command.trim()) {
-          newHistory.push({
-            type: 'output',
-            content: `Command not found: ${command}`
-          });
+      default: {
+        if (raw.startsWith("echo ")) {
+          println(raw.substring(5));
+        } else if (raw.trim()) {
+          println(`Command not found: ${raw}`);
         }
+        prompt();
+      }
     }
-    
-    setHistory(newHistory);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleCommand(input);
-      setInput("");
-    }
-  };
+  }
 
   return (
     <div className="h-full bg-[#1e1e1e] flex flex-col border-t border-[#3e3e42]">
@@ -200,6 +256,11 @@ export function Terminal({ onClose }: TerminalProps) {
             variant="ghost"
             size="icon"
             className="h-6 w-6 text-[#cccccc] hover:bg-[#3e3e42]"
+            onClick={() => {
+              // Optional: support multiple terminals later
+              // For now just focus prompt
+              prompt();
+            }}
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -215,45 +276,11 @@ export function Terminal({ onClose }: TerminalProps) {
       </div>
 
       {/* Terminal Content */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 min-h-0 overflow-auto" ref={scrollRef}>
-          <div className="p-3 font-mono text-sm">
-            {history.map((item, index) => (
-              <div
-                key={index}
-                className={`${
-                  item.type === 'command'
-                    ? 'text-[#4ec9b0]'
-                    : 'text-[#cccccc]'
-                } whitespace-pre-wrap`}
-              >
-                {item.content}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Input Line */}
-        <div className="flex items-center px-3 py-2 border-t border-[#3e3e42]">
-          {/* Styled prompt: @username -> /workspace $ */}
-          <span className="font-mono text-sm mr-2 whitespace-pre">
-            <span className="text-[#4ec9b0]">@{userHandle}</span>
-            <span className="text-[#56b6c2]"> → </span>
-            <span className="text-[#61afef]">{workingDir}</span>
-            <span className="text-[#cccccc]"> $</span>
-          </span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="flex-1 bg-transparent text-white font-mono text-sm outline-none"
-            placeholder="Type a command..."
-            autoFocus
-          />
-        </div>
+      <div className="flex-1 min-h-0">
+        <div ref={containerRef} className="w-full h-full" />
       </div>
+
+      {/* Input line removed; xterm handles input */}
     </div>
   );
 }
