@@ -46,6 +46,38 @@ Happy coding! 🚀`,
   ]);
   const [activeTab, setActiveTab] = useState("welcome");
 
+  // Add: map file extension to Monaco language ids
+  function detectLanguage(name: string, provided?: string | null): string {
+    if (provided && provided.trim()) return provided;
+    const ext = name.toLowerCase().split(".").pop() || "";
+    const map: Record<string, string> = {
+      js: "javascript",
+      jsx: "javascript",
+      ts: "typescript",
+      tsx: "typescript",
+      json: "json",
+      md: "markdown",
+      markdown: "markdown",
+      html: "html",
+      htm: "html",
+      css: "css",
+      scss: "scss",
+      less: "less",
+      py: "python",
+      pyw: "python",
+      sh: "shell",
+      bash: "shell",
+      yml: "yaml",
+      yaml: "yaml",
+      xml: "xml",
+      svg: "xml",
+      txt: "plaintext",
+      env: "plaintext",
+      gitignore: "plaintext",
+    };
+    return map[ext] || "plaintext";
+  }
+
   // Add: listen for external "open-file" events to open/focus tabs
   useEffect(() => {
     function handleOpenFile(e: Event) {
@@ -60,19 +92,19 @@ Happy coding! 🚀`,
       setTabs((prev) => {
         const exists = prev.find((t) => t.id === detail._id);
         if (exists) {
-          // Focus existing tab
+          // Focus existing tab (keep previous language)
           setActiveTab(detail._id);
           return prev;
         }
-        // Create new tab for file
+        // Create new tab for file with auto-detected language if missing
+        const lang = detectLanguage(detail.name, detail.language);
         const newTab = {
           id: detail._id,
           name: detail.name,
           content: detail.content ?? "",
-          language: detail.language ?? "plaintext",
+          language: lang,
           isDirty: false,
         };
-        // Focus the new tab
         setActiveTab(detail._id);
         return [...prev, newTab];
       });

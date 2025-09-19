@@ -57,7 +57,7 @@ export function Terminal({ onClose }: TerminalProps) {
           background: "#1e1e1e",
           foreground: "#cccccc",
           cursor: "#cccccc",
-          selection: "#3e3e42",
+          selectionBackground: "#3e3e42",
           black: "#000000",
           red: "#f44747",
           green: "#4ec9b0",
