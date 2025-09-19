@@ -21,6 +21,16 @@ export function MonacoEditor({ value, language = "plaintext", onChange }: Props)
       smoothScrolling: true,
       cursorSmoothCaretAnimation: "on",
       theme: "vs-dark",
+
+      // Added: make suggestions available for all languages
+      quickSuggestions: { other: true, comments: true, strings: true },
+      suggestOnTriggerCharacters: true,
+      tabCompletion: "on",
+      wordBasedSuggestions: "allDocuments",
+      suggest: { preview: true, showWords: true },
+      parameterHints: { enabled: true },
+      // Keep snippets helpful even without full language servers:
+      snippetSuggestions: "inline",
     }),
     [],
   );
