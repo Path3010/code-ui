@@ -25,6 +25,9 @@ export function Terminal({ onClose }: TerminalProps) {
   const fitRef = useRef<FitAddon | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const currentInputRef = useRef<string>("");
+  // Add: refs to manage deferred init and resize observer
+  const initRafRef = useRef<number | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const projects = useQuery(api.projects.getUserProjects);
 
@@ -50,7 +53,8 @@ export function Terminal({ onClose }: TerminalProps) {
   function safeFit() {
     const container = containerRef.current;
     const fit = fitRef.current;
-    if (!container || !fit) return;
+    // Ensure terminal still exists and container has dimensions
+    if (!container || !fit || !termRef.current) return;
     const { clientWidth, clientHeight } = container;
     if (!clientWidth || !clientHeight) return;
     try {
@@ -60,9 +64,20 @@ export function Terminal({ onClose }: TerminalProps) {
     }
   }
 
-  // Initialize xterm
+  // Initialize xterm only when container has non-zero size; retry via rAF
   useEffect(() => {
-    if (containerRef.current && !termRef.current) {
+    function tryInit() {
+      // bail if already initialized or container missing
+      if (termRef.current || !containerRef.current) return;
+
+      const { clientWidth, clientHeight } = containerRef.current;
+      if (!clientWidth || !clientHeight) {
+        // Defer until we have dimensions
+        initRafRef.current = window.requestAnimationFrame(tryInit);
+        return;
+      }
+
+      // Proceed with init
       const term = new XTerm({
         convertEol: true,
         fontFamily: 'Consolas, "Courier New", monospace',
@@ -92,33 +107,45 @@ export function Terminal({ onClose }: TerminalProps) {
       });
       const fit = new FitAddon();
       term.loadAddon(fit);
-      term.open(containerRef.current);
+      term.open(containerRef.current!);
       fitRef.current = fit;
       termRef.current = term;
 
-      // Replace direct fit with safe fit
+      // Initial safe fits
       safeFit();
-      // Fit again on next tick to account for late layout
       setTimeout(safeFit, 0);
 
       printWelcome();
 
       term.onData((data: string) => handleTermInput(data));
       window.addEventListener("resize", handleResize);
+
+      // Observe size changes to refit safely
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+      resizeObserverRef.current = new ResizeObserver(() => {
+        safeFit();
+      });
+      resizeObserverRef.current.observe(containerRef.current!);
     }
+
+    tryInit();
+
     return () => {
+      if (initRafRef.current) {
+        cancelAnimationFrame(initRafRef.current);
+        initRafRef.current = null;
+      }
       window.removeEventListener("resize", handleResize);
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       termRef.current?.dispose();
       termRef.current = null;
       fitRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    // re-fit on layout changes safely
-    safeFit();
-  });
 
   function handleResize() {
     // Use safe fit on window resize
@@ -296,7 +323,8 @@ export function Terminal({ onClose }: TerminalProps) {
 
       {/* Terminal Content */}
       <div className="flex-1 min-h-0">
-        <div ref={containerRef} className="w-full h-full" />
+        {/* Ensure the terminal never renders into a zero-height container */}
+        <div ref={containerRef} className="w-full h-full min-h-[120px]" />
       </div>
 
       {/* Input line removed; xterm handles input */}
